@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visitor Dashboard - PAWEL-DOS</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #ffb000;
@@ -16,11 +17,13 @@
         }
         main {
             padding-top: 2rem;
+            padding-bottom: 4rem;
         }
         h1, h2 {
             color: #ffb000;
             border-bottom: 2px solid #ffb000;
             padding-bottom: 0.5rem;
+            margin-top: 2rem;
         }
         table {
             border: 1px solid #ffb000;
@@ -33,12 +36,28 @@
             background: #262626;
             padding: 1rem;
             border: 1px solid #ffb000;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             text-align: center;
         }
         .stats-number {
             font-size: 3rem;
             font-weight: bold;
+        }
+        .chart-container {
+            background: #262626;
+            padding: 1rem;
+            border: 1px solid #ffb000;
+            margin-bottom: 2rem;
+            height: 400px;
+        }
+        select {
+            background-color: #262626;
+            color: #ffb000;
+            border: 1px solid #ffb000;
+        }
+        select:focus {
+            border-color: #ffb000;
+            box-shadow: 0 0 0 0.2rem rgba(255, 176, 0, 0.25);
         }
     </style>
 </head>
@@ -46,9 +65,35 @@
     <main class="container">
         <h1>VISITOR DASHBOARD</h1>
         
-        <div class="stats-card">
-            <div class="stats-number">{{ total_visitors }}</div>
-            <div>TOTAL VISITORS</div>
+        <div class="grid">
+            <div class="stats-card">
+                <div class="stats-number">{{ total_visitors }}</div>
+                <div>TOTAL VISITORS</div>
+            </div>
+            <div>
+                <label for="period">Time Period:</label>
+                <select id="period" onchange="updateCharts()">
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d" selected>Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div>
+                <h2>TRAFFIC OVER TIME</h2>
+                <div class="chart-container">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+            <div>
+                <h2>COUNTRY DISTRIBUTION</h2>
+                <div class="chart-container">
+                    <canvas id="countryChart"></canvas>
+                </div>
+            </div>
         </div>
 
         <h2>RECENT ACTIVITY</h2>
@@ -87,5 +132,77 @@
             </table>
         </div>
     </main>
+
+    <script>
+        let timeChart = null;
+        let countryChart = null;
+
+        async function updateCharts() {
+            const period = document.getElementById('period').value;
+            const response = await fetch(`/api/dashboard-data?period=${period}`);
+            if (!response.ok) return;
+            const data = await response.json();
+
+            // Time Chart
+            if (timeChart) timeChart.destroy();
+            timeChart = new Chart(document.getElementById('timeChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.time_chart.labels,
+                    datasets: [{
+                        label: 'Visitors',
+                        data: data.time_chart.data,
+                        backgroundColor: '#ffb000',
+                        borderColor: '#ffb000',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#333' }, ticks: { color: '#ffb000' } },
+                        x: { grid: { color: '#333' }, ticks: { color: '#ffb000' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#ffb000' } }
+                    }
+                }
+            });
+
+            // Country Chart
+            if (countryChart) countryChart.destroy();
+            countryChart = new Chart(document.getElementById('countryChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.country_chart.labels,
+                    datasets: [{
+                        label: 'Visitors',
+                        data: data.country_chart.data,
+                        backgroundColor: '#ffb000',
+                        borderColor: '#ffb000',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: '#333' }, ticks: { color: '#ffb000' } },
+                        y: { grid: { color: '#333' }, ticks: { color: '#ffb000' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#ffb000' } }
+                    }
+                }
+            });
+        }
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCharts();
+        });
+    </script>
 </body>
 </html>

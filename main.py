@@ -3,13 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlalchemy import Column, Integer, String, DateTime, create_engine, text
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, text, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
 import os
 import secrets
 import requests
+from typing import Optional
 
 # Database setup
 # Using an absolute path or relative to /app in container
@@ -149,6 +150,49 @@ async def get_dashboard(request: Request, username: str = Depends(get_current_us
             "total_visitors": count,
             "recent_visitors": recent_list
         })
+    finally:
+        db.close()
+
+@app.get("/api/dashboard-data")
+async def get_dashboard_data(period: str = "7d", username: str = Depends(get_current_username)):
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.utcnow()
+        if period == "24h":
+            cutoff = now - datetime.timedelta(hours=24)
+            group_format = "%Y-%m-%d %H:00"
+        elif period == "7d":
+            cutoff = now - datetime.timedelta(days=7)
+            group_format = "%Y-%m-%d"
+        elif period == "30d":
+            cutoff = now - datetime.timedelta(days=30)
+            group_format = "%Y-%m-%d"
+        else: # all
+            cutoff = datetime.datetime(2000, 1, 1)
+            group_format = "%Y-%m"
+
+        # Time series data
+        time_query = db.query(
+            func.strftime(group_format, Visitor.timestamp).label("label"),
+            func.count(Visitor.id).label("count")
+        ).filter(Visitor.timestamp >= cutoff).group_by("label").order_by("label").all()
+
+        # Country data
+        country_query = db.query(
+            Visitor.country,
+            func.count(Visitor.id).label("count")
+        ).filter(Visitor.timestamp >= cutoff).group_by(Visitor.country).order_by(text("count DESC")).all()
+
+        return {
+            "time_chart": {
+                "labels": [r[0] for r in time_query],
+                "data": [r[1] for r in time_query]
+            },
+            "country_chart": {
+                "labels": [r[0] or "Unknown" for r in country_query],
+                "data": [r[1] for r in country_query]
+            }
+        }
     finally:
         db.close()
 
