@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visitor Dashboard - PAWEL-DOS</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        :root {
+            --primary: #ffb000;
+        }
+        body {
+            background-color: #1a1a1a;
+            color: #ffb000;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        main {
+            padding-top: 2rem;
+        }
+        h1, h2 {
+            color: #ffb000;
+            border-bottom: 2px solid #ffb000;
+            padding-bottom: 0.5rem;
+        }
+        table {
+            border: 1px solid #ffb000;
+        }
+        th, td {
+            border-bottom: 1px solid #333;
+            color: #ffb000;
+        }
+        .stats-card {
+            background: #262626;
+            padding: 1rem;
+            border: 1px solid #ffb000;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .stats-number {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>VISITOR DASHBOARD</h1>
+        
+        <div class="stats-card">
+            <div class="stats-number">{{ total_visitors }}</div>
+            <div>TOTAL VISITORS</div>
+        </div>
+
+        <h2>RECENT ACTIVITY</h2>
+        <div class="grid">
+            <table role="grid">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>IP Address</th>
+                        <th>Path</th>
+                        <th>Referer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in recent_visitors %}
+                    <tr>
+                        <td>{{ visitor.timestamp }}</td>
+                        <td>{{ visitor.ip }}</td>
+                        <td>{{ visitor.path }}</td>
+                        <td>{{ visitor.referer or 'None' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

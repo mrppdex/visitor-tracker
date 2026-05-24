@@ -1,10 +1,14 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from sqlalchemy import Column, Integer, String, DateTime, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
 import os
+import secrets
 
 # Database setup
 # Using an absolute path or relative to /app in container
@@ -28,6 +32,8 @@ os.makedirs("/app/data", exist_ok=True)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+security = HTTPBasic()
 
 # Add CORS middleware
 app.add_middleware(
@@ -37,6 +43,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = os.getenv("ADMIN_USERNAME", "admin")
+    correct_password = os.getenv("ADMIN_PASSWORD", "admin")
+    is_correct_username = secrets.compare_digest(credentials.username, correct_username)
+    is_correct_password = secrets.compare_digest(credentials.password, correct_password)
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 @app.get("/track")
 async def track_visitor(request: Request):
@@ -63,18 +82,29 @@ async def get_stats():
     db = SessionLocal()
     try:
         count = db.query(Visitor).count()
-        recent = db.query(Visitor).order_by(Visitor.timestamp.desc()).limit(10).all()
-        # Convert to dict for JSON serialization
+        return {"total_visitors": count}
+    finally:
+        db.close()
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard(request: Request, username: str = Depends(get_current_username)):
+    db = SessionLocal()
+    try:
+        count = db.query(Visitor).count()
+        recent = db.query(Visitor).order_by(Visitor.timestamp.desc()).limit(100).all()
         recent_list = []
         for v in recent:
             recent_list.append({
-                "timestamp": v.timestamp.isoformat(),
+                "timestamp": v.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "ip": v.ip_address,
-                "ua": v.user_agent,
-                "referer": v.referer,
-                "path": v.path
+                "path": v.path,
+                "referer": v.referer
             })
-        return {"total_visitors": count, "recent_visitors": recent_list}
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request,
+            "total_visitors": count,
+            "recent_visitors": recent_list
+        })
     finally:
         db.close()
 
