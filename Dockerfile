@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY main.py .
+COPY . .
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chmod 777 /app/data
