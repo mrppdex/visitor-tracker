@@ -100,8 +100,7 @@ async def get_dashboard(request: Request, username: str = Depends(get_current_us
                 "path": v.path,
                 "referer": v.referer
             })
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "dashboard.html", {
             "total_visitors": count,
             "recent_visitors": recent_list
         })
