@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 import datetime
 import os
 import secrets
+import requests
 
 # Database setup
 # Using an absolute path or relative to /app in container
@@ -26,6 +27,8 @@ class Visitor(Base):
     user_agent = Column(String)
     referer = Column(String)
     path = Column(String)
+    country = Column(String, nullable=True)
+    country_code = Column(String, nullable=True)
 
 # Ensure data directory exists
 os.makedirs("/app/data", exist_ok=True)
@@ -44,6 +47,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_country_info(ip: str):
+    try:
+        # Use ip-api.com (free for non-commercial use, no key needed for low volume)
+        response = requests.get(f"http://ip-api.com/json/{ip}", timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "success":
+                return data.get("country"), data.get("countryCode")
+    except Exception:
+        pass
+    return None, None
+
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = os.getenv("ADMIN_USERNAME", "admin")
     correct_password = os.getenv("ADMIN_PASSWORD", "admin")
@@ -61,11 +76,22 @@ def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
 async def track_visitor(request: Request):
     db = SessionLocal()
     try:
+        # Check X-Forwarded-For because of Sliplane's proxy
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip = forwarded_for.split(",")[0].strip()
+        else:
+            ip = request.client.host
+
+        country, country_code = get_country_info(ip)
+
         visitor = Visitor(
-            ip_address=request.client.host,
+            ip_address=ip,
             user_agent=request.headers.get("user-agent"),
             referer=request.headers.get("referer"),
-            path=request.query_params.get("url", "unknown")
+            path=request.query_params.get("url", "unknown"),
+            country=country,
+            country_code=country_code
         )
         db.add(visitor)
         db.commit()
@@ -98,7 +124,9 @@ async def get_dashboard(request: Request, username: str = Depends(get_current_us
                 "timestamp": v.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "ip": v.ip_address,
                 "path": v.path,
-                "referer": v.referer
+                "referer": v.referer,
+                "country": v.country,
+                "country_code": v.country_code
             })
         return templates.TemplateResponse(request, "dashboard.html", {
             "total_visitors": count,

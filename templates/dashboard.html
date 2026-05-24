@@ -57,7 +57,7 @@
                 <thead>
                     <tr>
                         <th>Timestamp</th>
-                        <th>IP Address</th>
+                        <th>Location</th>
                         <th>Path</th>
                         <th>Referer</th>
                     </tr>
@@ -66,7 +66,19 @@
                     {% for visitor in recent_visitors %}
                     <tr>
                         <td>{{ visitor.timestamp }}</td>
-                        <td>{{ visitor.ip }}</td>
+                        <td>
+                            {% if visitor.country_code %}
+                            <img src="https://flagcdn.com/24x18/{{ visitor.country_code.lower() }}.png" 
+                                 width="24" height="18" 
+                                 alt="{{ visitor.country }}" 
+                                 style="vertical-align: middle; margin-right: 8px;">
+                            {{ visitor.country }}
+                            {% else %}
+                            Unknown
+                            {% endif %}
+                            <br/>
+                            <small style="color: #666;">{{ visitor.ip }}</small>
+                        </td>
                         <td>{{ visitor.path }}</td>
                         <td>{{ visitor.referer or 'None' }}</td>
                     </tr>

@@ -2,3 +2,4 @@ fastapi>=0.100.0
 uvicorn
 sqlalchemy
 jinja2
+requests
