@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
-from sqlalchemy import Column, Integer, String, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
@@ -33,6 +33,23 @@ class Visitor(Base):
 # Ensure data directory exists
 os.makedirs("/app/data", exist_ok=True)
 Base.metadata.create_all(bind=engine)
+
+# Migration: Add country columns if they don't exist
+def migrate_db():
+    with engine.connect() as conn:
+        # PRAGMA table_info returns (cid, name, type, notnull, dflt_value, pk)
+        res = conn.execute(text("PRAGMA table_info(visitors)"))
+        columns = [row[1] for row in res.fetchall()]
+        if "country" not in columns:
+            conn.execute(text("ALTER TABLE visitors ADD COLUMN country TEXT"))
+        if "country_code" not in columns:
+            conn.execute(text("ALTER TABLE visitors ADD COLUMN country_code TEXT"))
+        conn.commit()
+
+try:
+    migrate_db()
+except Exception as e:
+    print(f"Migration error: {e}")
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
