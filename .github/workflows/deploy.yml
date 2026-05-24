@@ -39,4 +39,4 @@ jobs:
       - name: Deploy to Sliplane
         run: |
           # Replace 'your-service-id' with your actual Sliplane Service ID
-          curl "https://api.sliplane.io/deploy/your-service-id/${{ secrets.DEPLOY_SECRET }}?tag=${{ github.sha }}"
+          curl "https://api.sliplane.io/deploy/service_z5lr18d6hu13/${{ secrets.DEPLOY_SECRET }}?tag=${{ github.sha }}"
