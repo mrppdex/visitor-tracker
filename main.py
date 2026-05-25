@@ -61,10 +61,17 @@ security = HTTPBasic()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://pawelpiela.com",
+        "https://www.pawelpiela.com",
+        "https://pawelnet.netlify.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "*"
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["*"],
 )
 
 def get_country_info(ip: str):
