@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -10,7 +10,9 @@ import datetime
 import os
 import secrets
 import requests
-from typing import Optional
+import smtplib
+from email.message import EmailMessage
+from typing import Optional, List
 
 # Database setup
 # Using an absolute path or relative to /app in container
@@ -195,6 +197,78 @@ async def get_dashboard_data(period: str = "7d", username: str = Depends(get_cur
         }
     finally:
         db.close()
+
+def send_contact_email(name: str, title: str, message: str, country: Optional[str], ip: str, files: List[UploadFile]):
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    admin_email = os.getenv("ADMIN_EMAIL", "aspiela@gmail.com")
+
+    if not all([smtp_server, smtp_user, smtp_password]):
+        print("SMTP configuration missing. Cannot send email.")
+        return
+
+    msg = EmailMessage()
+    msg['Subject'] = f"Blog Contact: {title or 'No Title'} (from {name or 'Anonymous'})"
+    msg['From'] = smtp_user
+    msg['To'] = admin_email
+
+    body = f"""
+New contact form submission:
+
+Name: {name or 'Anonymous'}
+Title: {title or 'No Title'}
+Country: {country or 'Unknown'} (IP: {ip})
+Timestamp: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+
+Message:
+--------------------------------------------------
+{message}
+--------------------------------------------------
+"""
+    msg.set_content(body)
+
+    for file in files:
+        file_content = file.file.read()
+        maintype, subtype = file.content_type.split('/', 1)
+        msg.add_attachment(
+            file_content,
+            maintype=maintype,
+            subtype=subtype,
+            filename=file.filename
+        )
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
+@app.post("/contact")
+async def contact_me(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    name: str = Form(None),
+    title: str = Form(None),
+    message: str = Form(...),
+    files: List[UploadFile] = File([])
+):
+    # Extract IP
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip = forwarded_for.split(",")[0].strip()
+    else:
+        ip = request.client.host
+
+    country, _ = get_country_info(ip)
+
+    # Send email in background to not block response
+    background_tasks.add_task(send_contact_email, name, title, message, country, ip, files)
+
+    return {"status": "success", "message": "Your message has been sent."}
 
 @app.get("/")
 async def root():
